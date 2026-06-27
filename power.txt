@@ -1,0 +1,9 @@
+Get-Process -Name collector -ErrorAction SilentlyContinue | Format-Table Id, ProcessName, StartTime; Write-Host "---"; if (Test-Path C:\Windows\Temp\send_mail.ps1) { Write-Host "send_mail.ps1 STILL EXISTS" } else { Write-Host "send_mail.ps1 cleaned up (email sent or deleted)" }; Write-Host "---"; Get-Content C:\Windows\Temp\collector_debug.log -Tail 10 -ErrorAction SilentlyContinue
+(iba to) 
+
+Write-Host "=== DEBUG LOG ==="; Get-Content C:\Windows\Temp\collector_debug.log -ErrorAction SilentlyContinue; Write-Host ""; Write-Host "=== EMAIL ERROR ==="; Get-Content C:\Windows\Temp\email_error.txt -ErrorAction SilentlyContinue
+(ibat to)
+
+Start-Process -NoNewWindow -FilePath "C:\Users\IT Helpdesk\Documents\pentest\collector.exe"
+
+Get-Process -Name collector -ErrorAction SilentlyContinue | Stop-Process -Force
