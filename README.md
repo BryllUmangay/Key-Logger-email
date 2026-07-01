@@ -1,4 +1,4 @@
-# Windows Keylogger & Document Exfiltrator
+# WinAPI Malware Simulation for Security Research
 
 A proof-of-concept Windows implant that logs keystrokes, collects Office documents, and exfiltrates them via Gmail SMTP. Built for authorized penetration testing, red team engagements, and cybersecurity education.
 
